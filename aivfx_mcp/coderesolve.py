@@ -37,6 +37,36 @@ def _get_json(url, headers=None, timeout=20):
         return json.loads(r.read().decode("utf-8", "ignore"))
 
 
+def _get_text(url, timeout=20):
+    req = urllib.request.Request(url, headers={"User-Agent": "ai-vfx-resolver"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return r.read().decode("utf-8", "ignore")
+
+
+_SCRAPE_SKIP = ("github.com", "huggingface.co", "arxiv.org", "twitter.com", "x.com",
+                "linkedin.com", "youtube.com", "youtu.be", "t.me", "reddit.com", "facebook.com")
+
+
+def _scrape_candidate(blob, out):
+    """A project/research page worth scraping for links (e.g. repo-sam.inria.fr) — the first URL that isn't
+    itself a repo/model/paper/social link."""
+    for u in re.findall(r'https?://[^\s"\'<>)]+', blob or ""):
+        if any(s in u.lower() for s in _SCRAPE_SKIP):
+            continue
+        return u.rstrip('.,);')                            # keep trailing '/' so relative links resolve correctly
+    return None
+
+
+def _best_repo(urls, name):
+    """Among GitHub URLs on a page, the one whose repo name matches best (reduces picking a fork/mirror)."""
+    best, bc = urls[0], -1.0
+    for u in urls:
+        c = _name_match(name, u.rstrip('/').split('/')[-1])
+        if c > bc:
+            bc, best = c, u
+    return best.rstrip('/')
+
+
 def _norm(s):
     return re.sub(r'[^a-z0-9]', '', (s or '').lower())
 
@@ -179,26 +209,57 @@ def find_paper_code(arxiv_id, *, http=_get_json):
             "official": bool(top.get("is_official")), "confidence": 0.9 if top.get("is_official") else 0.7}
 
 
-def resolve(name, text="", links=(), *, http=_get_json):
-    """Resolve all artifacts for one news item. Links in the post win; missing ones are searched by name.
-    Returns a payload-ready dict: github, hf_model, hf_quants, license, size_gb, arxiv."""
+def resolve(name, text="", links=(), *, http=_get_json, fetch_page=_get_text):
+    """Resolve all artifacts for one news item. Links in the post win; an academic/project page is scraped for
+    missing links; anything still missing is searched by name. Returns a payload-ready dict:
+    github, hf_model, hf_quants, license, size_gb, arxiv, docs."""
     blob = (text or "") + " " + " ".join(links or [])
     out = {"github": None, "hf_model": None, "hf_quants": [], "license": None, "size_gb": 0.0,
-           "arxiv": None, "docs": None}
+           "arxiv": None, "docs": None, "paper": None}
 
     for u in re.findall(r'https?://[^\s"\'<>)]+', blob):    # a documentation link present in the post (if any)
         if _is_docs(u):
             out["docs"] = u.rstrip('.,);'); break
 
-    gh = _GH_RE.search(blob)
-    if gh:
-        out["github"] = "https://github.com/" + gh.group(1).rstrip('/')
-    hf = _HF_RE.search(blob)
-    if hf:
-        out["hf_model"] = "https://huggingface.co/" + hf.group(1).rstrip('/')
-    ax = _ARXIV_RE.search(blob)
-    if ax:
-        out["arxiv"] = ax.group(1)
+    gh0 = _GH_RE.search(blob)
+    if gh0:
+        out["github"] = "https://github.com/" + gh0.group(1).rstrip('/')
+    hf0 = _HF_RE.search(blob)
+    if hf0:
+        out["hf_model"] = "https://huggingface.co/" + hf0.group(1).rstrip('/')
+    ax0 = _ARXIV_RE.search(blob)
+    if ax0:
+        out["arxiv"] = ax0.group(1)
+
+    if not (out["github"] and out["arxiv"]):               # post lacks code/paper -> scrape its project page
+        page = _scrape_candidate(blob, out)
+        if page:
+            try:
+                html = fetch_page(page) or ""
+            except Exception:
+                html = ""
+            if html:
+                if not out["github"]:
+                    ghs = ["https://github.com/" + m.rstrip('/') for m in _GH_RE.findall(html)]
+                    ghs = [g for g in ghs if not re.search(r'/(issues|pulls|blob|tree|wiki|releases)(/|$)', g)]
+                    if ghs:
+                        out["github"] = _best_repo(ghs, name)
+                if not out["arxiv"]:
+                    axs = _ARXIV_RE.findall(html)
+                    if axs:
+                        out["arxiv"] = axs[0]
+                if not out["hf_model"]:
+                    hfs = _HF_RE.findall(html)
+                    if hfs:
+                        out["hf_model"] = "https://huggingface.co/" + hfs[0].rstrip('/')
+                if not out["arxiv"] and not out["paper"]:    # academic page with a PDF paper, no arXiv
+                    mp = re.search(r'href=["\']([^"\']+\.pdf)["\']', html, re.I)
+                    if mp:
+                        out["paper"] = urllib.parse.urljoin(page, mp.group(1))
+                if not out["docs"]:
+                    for u in re.findall(r'https?://[^\s"\'<>)]+', html):
+                        if _is_docs(u):
+                            out["docs"] = u.rstrip('.,);'); break
 
     if not out["github"]:
         fc = find_code(name, http=http)
