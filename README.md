@@ -1,4 +1,4 @@
-<p align="center"><img src="assets/AI_Moon_Icon.jpg" width="120" alt="AI VFX"></p>
+<p align="center"><img src="assets/AI_Moon_Full.png" width="200" alt="AI VFX"></p>
 
 # AI VFX Feed MCP
 
