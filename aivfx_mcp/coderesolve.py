@@ -264,8 +264,16 @@ def resolve(name, text="", links=(), *, http=_get_json, fetch_page=_get_text):
                         if d not in out["docs"]:
                             out["docs"].append(d)
 
+    # Search the MISSING artifacts by a clean name. A known artifact link (HF/GitHub) gives a far better search
+    # name than the human headline ("Tencent's X runs on a 4090" won't match a repo); fall back to the headline.
+    search_name = name
+    if out["hf_model"]:
+        search_name = out["hf_model"].rstrip('/').split('/')[-1]
+    elif out["github"]:
+        search_name = out["github"].rstrip('/').split('/')[-1]
+
     if not out["github"]:
-        fc = find_code(name, http=http)
+        fc = find_code(search_name, http=http)
         if fc:
             out["github"] = fc["url"]
     if not out["hf_model"]:
@@ -273,7 +281,7 @@ def resolve(name, text="", links=(), *, http=_get_json, fetch_page=_get_text):
         if out["github"]:
             m = re.search(r'github\.com/([^/]+)/', out["github"])
             owner = m.group(1) if m else None
-        fm = find_model(name, http=http, prefer_org=owner)              # prefer the official HF org (repo owner)
+        fm = find_model(search_name, http=http, prefer_org=owner)        # prefer the official HF org (repo owner)
         if fm:
             out["hf_model"] = fm["url"]; out["license"] = fm.get("license"); out["size_gb"] = fm.get("size_gb", 0.0)
     if not out["github"] and out["arxiv"]:
@@ -281,5 +289,5 @@ def resolve(name, text="", links=(), *, http=_get_json, fetch_page=_get_text):
         if pc:
             out["github"] = pc["url"]
     if out["hf_model"]:
-        out["hf_quants"] = find_quants(name, http=http)
+        out["hf_quants"] = find_quants(search_name, http=http)
     return out
