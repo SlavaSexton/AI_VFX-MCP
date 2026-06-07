@@ -90,21 +90,29 @@ def _model_info(mid, http):
         return {}
 
 
-def find_model(name, *, http=_get_json):
-    """Best-matching Hugging Face model for a name, with license + size, or None below the floor."""
+def find_model(name, *, http=_get_json, prefer_org=None):
+    """Best-matching Hugging Face model for a name, with license + size, or None below the floor.
+    prefer_org (e.g. the GitHub repo owner) tie-breaks toward the OFFICIAL namespace over community mirrors."""
     q = urllib.parse.quote(name)
     try:
         res = http(f"{HF_API}/models?search={q}&sort=downloads&direction=-1&limit=10", None, 20)
     except Exception:
         return None
-    best, best_conf = None, 0.0
+    scored = []
     for it in res or []:
         mid = it.get("id") or it.get("modelId") or ""
-        conf = _name_match(name, mid.split("/")[-1])
-        if conf > best_conf:
-            best_conf, best = conf, it
-    if not best or best_conf < CONF_MIN:
+        if "/" not in mid:
+            continue
+        org, nm = mid.split("/", 1)
+        conf = _name_match(name, nm)
+        if conf < CONF_MIN:
+            continue
+        org_strong = 1 if (prefer_org and _name_match(prefer_org, org) >= 0.8) else 0   # official namespace
+        scored.append((org_strong, round(conf, 4), it.get("downloads", 0) or 0, it))
+    if not scored:
         return None
+    scored.sort(key=lambda t: (t[0], t[1], t[2]), reverse=True)          # official org first, then name, then popularity
+    _os, best_conf, _dl, best = scored[0]
     mid = best.get("id") or best.get("modelId")
     info = _model_info(mid, http)
     license_ = ((info.get("cardData") or {}).get("license")) or _tag_license(info.get("tags"))
@@ -183,7 +191,11 @@ def resolve(name, text="", links=(), *, http=_get_json):
         if fc:
             out["github"] = fc["url"]
     if not out["hf_model"]:
-        fm = find_model(name, http=http)
+        owner = None
+        if out["github"]:
+            m = re.search(r'github\.com/([^/]+)/', out["github"])
+            owner = m.group(1) if m else None
+        fm = find_model(name, http=http, prefer_org=owner)              # prefer the official HF org (repo owner)
         if fm:
             out["hf_model"] = fm["url"]; out["license"] = fm.get("license"); out["size_gb"] = fm.get("size_gb", 0.0)
     if not out["github"] and out["arxiv"]:
