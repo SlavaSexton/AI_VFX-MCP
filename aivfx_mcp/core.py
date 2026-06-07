@@ -8,7 +8,7 @@ resolved artifacts (github, hf_model, hf_quants, license, model_size_gb, arxiv).
 
 External dependencies (embedding, Qdrant) are injected so the logic can be tested offline. The defaults talk to a
 local Ollama + Qdrant; override via env (OLLAMA_URL, QDRANT_URL, FEED_COLLECTION, EMBED_MODEL)."""
-import os, json, urllib.request
+import os, re, json, html, urllib.request
 
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
 QDRANT_URL = os.environ.get("QDRANT_URL", "http://localhost:6333")
@@ -80,6 +80,55 @@ def _hf_id(url_or_id):
     if not url_or_id:
         return None
     return url_or_id.split("huggingface.co/")[-1].rstrip("/")
+
+
+def _get_text(url, timeout=20):
+    req = urllib.request.Request(url, headers={"User-Agent": "ai-vfx-mcp"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return r.read().decode("utf-8", "ignore")
+
+
+def _strip_html(s):
+    s = re.sub(r'(?is)<(script|style)[^>]*>.*?</\1>', ' ', s)
+    s = re.sub(r'(?s)<[^>]+>', ' ', s)
+    s = html.unescape(s)
+    s = re.sub(r'[ \t]+', ' ', s)
+    s = re.sub(r'\n\s*\n\s*\n+', '\n\n', s)
+    return s.strip()
+
+
+def _looks_html(s):
+    return bool(re.search(r'(?i)<html|<body|<div|<p[ >]|<head', s))
+
+
+def read_docs(url, max_chars=20000, *, http_get=_get_text):
+    """Fetch readable documentation text for a URL so an agent can implement from it when no runnable repo exists.
+    GitHub/HF resolve to the raw README/model-card; other pages are fetched and stripped of HTML. Consumer-side
+    only — this never feeds the pipeline's writer model."""
+    targets = [url]
+    mg = re.search(r'github\.com/([^/\s]+)/([^/\s#?]+)', url or "")
+    mh = re.search(r'huggingface\.co/([^\s#?]+)', url or "")
+    if mg:
+        o, r = mg.group(1), mg.group(2)
+        targets = [f"https://raw.githubusercontent.com/{o}/{r}/main/README.md",
+                   f"https://raw.githubusercontent.com/{o}/{r}/master/README.md"]
+    elif mh:
+        rid = mh.group(1).rstrip("/")
+        targets = [f"https://huggingface.co/{rid}/raw/main/README.md",
+                   f"https://huggingface.co/{rid}/raw/master/README.md"]
+    text, used = "", url
+    for t in targets:
+        try:
+            body = http_get(t) or ""
+        except Exception:
+            body = ""
+        if body.strip():
+            text, used = body, t
+            break
+    if _looks_html(text):
+        text = _strip_html(text)
+    text = text.strip()[:max_chars]
+    return {"url": url, "source": used, "text": text, "chars": len(text)}
 
 
 def install_plan(item):

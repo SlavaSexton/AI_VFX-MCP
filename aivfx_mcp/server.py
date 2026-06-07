@@ -40,6 +40,13 @@ def resolve_artifacts(name: str, text: str = "") -> dict:
     return coderesolve.resolve(name, text)
 
 
+@mcp.tool()
+def read_docs(url: str, max_chars: int = 20000) -> dict:
+    """Fetch readable documentation text for a URL (GitHub/HF README, arXiv, docs page) so the agent can
+    implement a technique even when there is no runnable repo. Returns {url, source, text, chars}."""
+    return core.read_docs(url, max_chars)
+
+
 def main():
     mcp.run()
 

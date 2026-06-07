@@ -59,3 +59,53 @@ def test_install_plan_builds_git_and_hf_commands():
 
 def test_install_plan_empty_without_artifacts():
     assert core.install_plan({"title": "news only, no code"}) == []
+
+
+# ---------- read_docs: fetch readable text so an agent can implement when there's no repo ----------
+
+class FakeGet:
+    def __init__(self, routes):
+        self.routes = routes
+        self.calls = []
+    def __call__(self, url, timeout=20):
+        self.calls.append(url)
+        for frag, resp in self.routes.items():
+            if frag in url:
+                if isinstance(resp, Exception):
+                    raise resp
+                return resp
+        return ""
+
+
+def test_read_docs_github_returns_readme():
+    g = FakeGet({"raw.githubusercontent.com": "# Proj\nInstall and run it."})
+    d = core.read_docs("https://github.com/o/r", http_get=g)
+    assert "Install and run it." in d["text"]
+    assert "README" in d["source"]
+
+
+def test_read_docs_hf_returns_model_card():
+    g = FakeGet({"huggingface.co": "# Model\nUse with diffusers."})
+    d = core.read_docs("https://huggingface.co/org/model", http_get=g)
+    assert "diffusers" in d["text"]
+    assert "raw/main/README" in d["source"]
+
+
+def test_read_docs_strips_html_for_generic_page():
+    g = FakeGet({"example.com": "<html><head><style>x{}</style></head><body><h1>Title</h1><p>Body &amp; more</p></body></html>"})
+    d = core.read_docs("https://example.com/docs", http_get=g)
+    assert "Title" in d["text"] and "Body & more" in d["text"]
+    assert "<" not in d["text"]
+
+
+def test_read_docs_truncates_to_max_chars():
+    g = FakeGet({"example.com": "A" * 5000})
+    d = core.read_docs("https://example.com/x", max_chars=100, http_get=g)
+    assert len(d["text"]) <= 100
+
+
+def test_read_docs_github_falls_back_to_master():
+    g = FakeGet({"/main/README.md": ValueError("404"), "/master/README.md": "# Old\nlegacy build"})
+    d = core.read_docs("https://github.com/o/r", http_get=g)
+    assert "legacy build" in d["text"]
+    assert "master" in d["source"]
