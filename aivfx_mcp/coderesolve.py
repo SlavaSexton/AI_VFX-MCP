@@ -19,6 +19,19 @@ _ARXIV_RE = re.compile(r'arxiv\.org/abs/(\d{4}\.\d{4,5})', re.I)
 _DOCS_RE  = re.compile(r'(?:^|//|\.)docs?\.|/docs?(?:/|$)|readthedocs\.io|/wiki(?:/|$)|developer\.|/documentation|\.dev/docs', re.I)
 
 
+_TECH_RE = re.compile(
+    r'(github|hugging\s*face|huggingface|arxiv|open[\s-]?source|open[\s-]?weights|model weights|'
+    r'the model|ai model|video model|language model|image model|world model|diffusion|\bweights\b|'
+    r'checkpoint|gguf|safetensors|\blora\b|fine[\s-]?tun|quantiz|comfyui|inference|'
+    r'self[\s-]?host|run (?:it )?locally|on[\s-]?device|open[\s-]?model)', re.I)
+
+
+def _is_technical(text):
+    """True if the post is actually about a model/code/release (so it's worth searching for artifacts).
+    A marketing/design post ('everyone deserves to design', a cafe opening) returns False -> no code/docs block."""
+    return bool(_TECH_RE.search(text or ""))
+
+
 def _is_docs(u):
     """A documentation/guide URL (not a repo/model/paper) an agent can read to implement from."""
     ul = (u or "").lower()
@@ -272,22 +285,28 @@ def resolve(name, text="", links=(), *, http=_get_json, fetch_page=_get_text):
     elif out["github"]:
         search_name = out["github"].rstrip('/').split('/')[-1]
 
-    if not out["github"]:
-        fc = find_code(search_name, http=http)
-        if fc:
-            out["github"] = fc["url"]
-    if not out["hf_model"]:
-        owner = None
-        if out["github"]:
-            m = re.search(r'github\.com/([^/]+)/', out["github"])
-            owner = m.group(1) if m else None
-        fm = find_model(search_name, http=http, prefer_org=owner)        # prefer the official HF org (repo owner)
-        if fm:
-            out["hf_model"] = fm["url"]; out["license"] = fm.get("license"); out["size_gb"] = fm.get("size_gb", 0.0)
-    if not out["github"] and out["arxiv"]:
-        pc = find_paper_code(out["arxiv"], http=http)
-        if pc:
-            out["github"] = pc["url"]
-    if out["hf_model"]:
-        out["hf_quants"] = find_quants(search_name, http=http)
+    # GATE: only hunt for artifacts when the post already HAS a code/model/paper link (proof it's technical) OR the
+    # text is clearly about a model/code/release. A marketing/design post gets NO blind name-search -> no junk block.
+    has_code_artifact = bool(out["github"] or out["hf_model"] or out["arxiv"] or out["paper"])
+    allow_search = has_code_artifact or _is_technical(blob)
+
+    if allow_search:
+        if not out["github"]:
+            fc = find_code(search_name, http=http)
+            if fc:
+                out["github"] = fc["url"]
+        if not out["hf_model"]:
+            owner = None
+            if out["github"]:
+                m = re.search(r'github\.com/([^/]+)/', out["github"])
+                owner = m.group(1) if m else None
+            fm = find_model(search_name, http=http, prefer_org=owner)    # prefer the official HF org (repo owner)
+            if fm:
+                out["hf_model"] = fm["url"]; out["license"] = fm.get("license"); out["size_gb"] = fm.get("size_gb", 0.0)
+        if not out["github"] and out["arxiv"]:
+            pc = find_paper_code(out["arxiv"], http=http)
+            if pc:
+                out["github"] = pc["url"]
+        if out["hf_model"]:
+            out["hf_quants"] = find_quants(search_name, http=http)
     return out
