@@ -215,11 +215,13 @@ def resolve(name, text="", links=(), *, http=_get_json, fetch_page=_get_text):
     github, hf_model, hf_quants, license, size_gb, arxiv, docs."""
     blob = (text or "") + " " + " ".join(links or [])
     out = {"github": None, "hf_model": None, "hf_quants": [], "license": None, "size_gb": 0.0,
-           "arxiv": None, "docs": None, "paper": None}
+           "arxiv": None, "docs": [], "paper": None}
 
-    for u in re.findall(r'https?://[^\s"\'<>)]+', blob):    # a documentation link present in the post (if any)
+    for u in re.findall(r'https?://[^\s"\'<>)]+', blob):    # documentation links present in the post (may be several)
         if _is_docs(u):
-            out["docs"] = u.rstrip('.,);'); break
+            d = u.rstrip('.,);')
+            if d not in out["docs"]:
+                out["docs"].append(d)
 
     gh0 = _GH_RE.search(blob)
     if gh0:
@@ -256,10 +258,11 @@ def resolve(name, text="", links=(), *, http=_get_json, fetch_page=_get_text):
                     mp = re.search(r'href=["\']([^"\']+\.pdf)["\']', html, re.I)
                     if mp:
                         out["paper"] = urllib.parse.urljoin(page, mp.group(1))
-                if not out["docs"]:
-                    for u in re.findall(r'https?://[^\s"\'<>)]+', html):
-                        if _is_docs(u):
-                            out["docs"] = u.rstrip('.,);'); break
+                for u in re.findall(r'https?://[^\s"\'<>)]+', html):   # collect doc links from the page too
+                    if _is_docs(u):
+                        d = u.rstrip('.,);')
+                        if d not in out["docs"]:
+                            out["docs"].append(d)
 
     if not out["github"]:
         fc = find_code(name, http=http)
