@@ -16,6 +16,15 @@ HF_API  = "https://huggingface.co/api"
 PWC_API = "https://paperswithcode.com/api/v1"
 
 _ARXIV_RE = re.compile(r'arxiv\.org/abs/(\d{4}\.\d{4,5})', re.I)
+_DOCS_RE  = re.compile(r'(?:^|//|\.)docs?\.|/docs?(?:/|$)|readthedocs\.io|/wiki(?:/|$)|developer\.|/documentation|\.dev/docs', re.I)
+
+
+def _is_docs(u):
+    """A documentation/guide URL (not a repo/model/paper) an agent can read to implement from."""
+    ul = (u or "").lower()
+    if any(h in ul for h in ("github.com", "huggingface.co", "arxiv.org")):
+        return False
+    return bool(_DOCS_RE.search(ul))
 _GH_RE    = re.compile(r'github\.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)', re.I)
 _HF_RE    = re.compile(r'huggingface\.co/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)', re.I)
 
@@ -174,7 +183,12 @@ def resolve(name, text="", links=(), *, http=_get_json):
     """Resolve all artifacts for one news item. Links in the post win; missing ones are searched by name.
     Returns a payload-ready dict: github, hf_model, hf_quants, license, size_gb, arxiv."""
     blob = (text or "") + " " + " ".join(links or [])
-    out = {"github": None, "hf_model": None, "hf_quants": [], "license": None, "size_gb": 0.0, "arxiv": None}
+    out = {"github": None, "hf_model": None, "hf_quants": [], "license": None, "size_gb": 0.0,
+           "arxiv": None, "docs": None}
+
+    for u in re.findall(r'https?://[^\s"\'<>)]+', blob):    # a documentation link present in the post (if any)
+        if _is_docs(u):
+            out["docs"] = u.rstrip('.,);'); break
 
     gh = _GH_RE.search(blob)
     if gh:

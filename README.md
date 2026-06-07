@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/AI_Moon_Icon.jpg" width="120" alt="AI VFX"></p>
+
 # AI VFX Feed MCP
 
 An MCP server that gives any AI agent searchable access to the **AI VFX** news pipeline (`@AI_VFX_NEWS`) and, more
@@ -18,7 +20,9 @@ that speaks MCP. API is API.
 - **`install_plan(github, hf_model, hf_quants)`** — turns an item's artifacts into ready-to-run commands
   (`git clone …`, `huggingface-cli download …`). The calling agent runs them under its own rules.
 - **`resolve_artifacts(name, text)`** — on-demand resolver for items not pre-resolved: finds the GitHub repo, the
-  Hugging Face model (license/size) and its quantizations, and arXiv → code via Papers with Code.
+  Hugging Face model (license/size) and its quantizations, arXiv → code via Papers with Code, and a docs link.
+- **`read_docs(url, max_chars=20000)`** — fetch readable text (GitHub/HF README, arXiv, docs page) so an agent can
+  implement a technique even when there is no runnable repo.
 
 The feed is kept fresh by the pipeline, so reads are offline-friendly and put zero load on the running bot.
 
