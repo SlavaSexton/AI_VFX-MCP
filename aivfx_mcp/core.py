@@ -42,6 +42,14 @@ def qdrant_scroll_default(limit):
     return (res.get("result") or {}).get("points") or []
 
 
+def qdrant_get_default(point_id):
+    """Retrieve one point (with payload) by its Qdrant id — used to fetch a specific post's workflow."""
+    res = _post(f"{QDRANT_URL}/collections/{COLLECTION}/points",
+                {"ids": [point_id], "with_payload": True}, 20)
+    pts = res.get("result") or []
+    return pts[0] if pts else None
+
+
 def item_from_point(p):
     """Map a Qdrant hit to a clean, agent-friendly item."""
     pl = p.get("payload") or {}
@@ -78,6 +86,53 @@ def latest(n=10, *, qdrant_scroll=qdrant_scroll_default):
     items = [it for it in items if it.get("date")]
     items.sort(key=lambda it: it["date"], reverse=True)
     return items[:n]
+
+
+def _read_workflow_file(path, max_chars=262144):
+    """Read a workflow file as text for inlining to the agent. Returns (content, None) or (None, error).
+    Missing/too-large/binary -> error string (the caller falls back to the Telegram download link)."""
+    try:
+        with open(path, "rb") as f:
+            data = f.read(max_chars + 1)
+    except Exception:
+        return None, "file not found on the feed host"
+    if len(data) > max_chars:
+        return None, f"file too large to inline ({max_chars}+ bytes) — download from Telegram"
+    try:
+        return data.decode("utf-8"), None
+    except Exception:
+        return None, "binary file — download from Telegram"
+
+
+def get_workflow(post_id="", query="", *, embed=embed_ollama, qdrant_search=qdrant_search_default,
+                 qdrant_get=qdrant_get_default, read_file=_read_workflow_file):
+    """Fetch the workflow file attached to a feed post. Resolve the post by Qdrant point id (post_id — an
+    item's 'id' from search_feed/latest) OR by semantic query (first matching post that has a workflow), read
+    its file from the feed host, and return {filename, content, tg_url, post_title}. If the file can't be
+    inlined (binary / too large / missing) returns {error, filename, tg_url, post_title} so the agent can
+    download it from Telegram instead."""
+    point = None
+    if post_id:
+        point = qdrant_get(post_id)
+    elif query:
+        for p in qdrant_search(embed(query), 8):
+            pl = p.get("payload") or {}
+            if pl.get("has_workflow") and pl.get("workflow_path"):
+                point = p
+                break
+    if not point:
+        return {"error": "no matching post found"}
+    pl = point.get("payload") or {}
+    if not (pl.get("has_workflow") and pl.get("workflow_path")):
+        return {"error": "this post has no workflow attached", "post_title": pl.get("title")}
+    content, err = read_file(pl["workflow_path"])
+    out = {"filename": pl.get("workflow_file"), "tg_url": pl.get("workflow_tg_url"),
+           "post_title": pl.get("title")}
+    if err:
+        out["error"] = err
+    else:
+        out["content"] = content
+    return out
 
 
 def _hf_id(url_or_id):

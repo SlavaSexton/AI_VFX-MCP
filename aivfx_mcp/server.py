@@ -47,6 +47,15 @@ def read_docs(url: str, max_chars: int = 20000) -> dict:
     return core.read_docs(url, max_chars)
 
 
+@mcp.tool()
+def get_workflow(post_id: str = "", query: str = "") -> dict:
+    """Download the workflow file attached to a feed post (e.g. a ComfyUI/n8n JSON the editor attached when
+    it isn't available online). Pass post_id (an item's 'id' from search_feed/latest) or a query. Returns
+    {filename, content, tg_url, post_title}; if the file can't be inlined (binary/too large) returns
+    {error, tg_url, ...} to download from Telegram."""
+    return core.get_workflow(post_id=post_id, query=query)
+
+
 def main():
     mcp.run()
 

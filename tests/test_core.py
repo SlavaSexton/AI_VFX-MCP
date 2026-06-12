@@ -123,3 +123,48 @@ def test_item_from_point_workflow_defaults():
     it = core.item_from_point({"id": "u", "payload": {"title": "Bare"}})
     assert it["has_workflow"] in (None, False) and it["workflow_file"] is None
     assert it["workflow_tg_url"] is None
+
+
+def test_get_workflow_by_post_id_returns_content():
+    pt = {"id": "u1", "payload": {"has_workflow": True, "workflow_path": "/w/f.json",
+          "workflow_file": "f.json", "workflow_tg_url": "https://t.me/AI_VFX_NEWS/9", "title": "Relight"}}
+    out = core.get_workflow(post_id="u1", qdrant_get=lambda i: pt if i == "u1" else None,
+                            read_file=lambda p: ('{"node":1}', None))
+    assert out["filename"] == "f.json" and out["content"] == '{"node":1}'
+    assert out["tg_url"].endswith("/9") and out["post_title"] == "Relight"
+
+
+def test_get_workflow_by_query_picks_first_with_workflow():
+    pts = [{"id": "a", "payload": {"title": "no wf"}},
+           {"id": "b", "payload": {"has_workflow": True, "workflow_path": "/w/b.json",
+            "workflow_file": "b.json", "workflow_tg_url": "u", "title": "WF"}}]
+    out = core.get_workflow(query="relight", embed=lambda t: [0.1],
+                            qdrant_search=lambda v, k: pts, read_file=lambda p: ("CONTENT", None))
+    assert out["content"] == "CONTENT" and out["filename"] == "b.json"
+
+
+def test_get_workflow_no_post():
+    assert "error" in core.get_workflow(post_id="x", qdrant_get=lambda i: None)
+
+
+def test_get_workflow_post_without_workflow():
+    pt = {"id": "u", "payload": {"title": "plain"}}
+    out = core.get_workflow(post_id="u", qdrant_get=lambda i: pt, read_file=lambda p: ("x", None))
+    assert "error" in out and "no workflow" in out["error"].lower()
+
+
+def test_get_workflow_binary_or_large_falls_back_to_tg_url():
+    pt = {"id": "u", "payload": {"has_workflow": True, "workflow_path": "/w/big.bin",
+          "workflow_file": "big.bin", "workflow_tg_url": "https://t.me/AI_VFX_NEWS/12", "title": "Big"}}
+    out = core.get_workflow(post_id="u", qdrant_get=lambda i: pt, read_file=lambda p: (None, "too large"))
+    assert "content" not in out and out["error"] == "too large" and out["tg_url"].endswith("/12")
+
+
+def test_read_workflow_file_real(tmp_path):
+    p = tmp_path / "f.json"; p.write_text('{"a":1}', encoding="utf-8")
+    c, e = core._read_workflow_file(str(p)); assert c == '{"a":1}' and e is None
+    c, e = core._read_workflow_file(str(tmp_path / "missing")); assert c is None and e
+    big = tmp_path / "big"; big.write_bytes(b"x" * 100)
+    c, e = core._read_workflow_file(str(big), max_chars=10); assert c is None and "large" in e
+    binf = tmp_path / "b.bin"; binf.write_bytes(b"\xff\xfe\x00\x01")
+    c, e = core._read_workflow_file(str(binf)); assert c is None and "binary" in e.lower()
