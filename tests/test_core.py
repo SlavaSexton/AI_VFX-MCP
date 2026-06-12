@@ -109,3 +109,17 @@ def test_read_docs_github_falls_back_to_master():
     d = core.read_docs("https://github.com/o/r", http_get=g)
     assert "legacy build" in d["text"]
     assert "master" in d["source"]
+
+
+def test_item_from_point_exposes_id_and_workflow():
+    it = core.item_from_point({"id": "u9", "payload": {
+        "title": "T", "has_workflow": True, "workflow_file": "f.json",
+        "workflow_tg_url": "https://t.me/AI_VFX_NEWS/9"}})
+    assert it["id"] == "u9" and it["has_workflow"] is True
+    assert it["workflow_file"] == "f.json" and it["workflow_tg_url"].endswith("/9")
+
+
+def test_item_from_point_workflow_defaults():
+    it = core.item_from_point({"id": "u", "payload": {"title": "Bare"}})
+    assert it["has_workflow"] in (None, False) and it["workflow_file"] is None
+    assert it["workflow_tg_url"] is None

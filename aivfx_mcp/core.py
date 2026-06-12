@@ -58,6 +58,10 @@ def item_from_point(p):
         "license": pl.get("license"),
         "model_size_gb": pl.get("model_size_gb"),
         "arxiv": pl.get("arxiv"),
+        "id": p.get("id"),
+        "has_workflow": pl.get("has_workflow"),
+        "workflow_file": pl.get("workflow_file"),
+        "workflow_tg_url": pl.get("workflow_tg_url"),
         "score": round(p.get("score", 0) or 0, 3),
     }
 
