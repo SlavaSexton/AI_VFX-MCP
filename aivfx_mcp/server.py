@@ -62,11 +62,26 @@ def main():
 
 def main_http():
     """Serve the feed over streamable-http on localhost, for a remote (Cloudflare-tunneled) MCP. Binds 127.0.0.1
-    so ONLY the local tunnel client can reach it, never the LAN. Env: MCP_HOST, MCP_PORT (default 8787).
+    so ONLY the local tunnel client can reach it, never the LAN. Env: MCP_HOST, MCP_PORT (default 8787),
+    MCP_ALLOWED_HOSTS (comma-separated public hostnames the tunnel serves under).
     Keep WORKFLOWS_ROOT set so get_workflow stays path-restricted, and put rate-limiting at the Cloudflare edge."""
     import os
+    from mcp.server.transport_security import TransportSecuritySettings
     mcp.settings.host = os.environ.get("MCP_HOST", "127.0.0.1")
     mcp.settings.port = int(os.environ.get("MCP_PORT", "8787"))
+    # Behind a tunnel the Host header is the PUBLIC hostname, not 127.0.0.1, so the SDK's default
+    # localhost-only DNS-rebinding guard 421s every tunneled request. With a fixed domain (named
+    # tunnel) pin it via MCP_ALLOWED_HOSTS and keep the guard ON; with an ephemeral quick tunnel
+    # (random *.trycloudflare.com each run) there is no stable host to pin, so disable the host
+    # check -- safe here because the origin binds 127.0.0.1 (only the local cloudflared client
+    # reaches it) and the feed is read-only.  RESPONSIBLE FOR: tunneled-host 421 fix (2026-06-24).
+    allowed = [h.strip() for h in os.environ.get("MCP_ALLOWED_HOSTS", "").split(",") if h.strip()]
+    if allowed:
+        mcp.settings.transport_security = TransportSecuritySettings(
+            enable_dns_rebinding_protection=True, allowed_hosts=allowed, allowed_origins=allowed)
+    else:
+        mcp.settings.transport_security = TransportSecuritySettings(
+            enable_dns_rebinding_protection=False)
     mcp.run(transport="streamable-http")
 
 
