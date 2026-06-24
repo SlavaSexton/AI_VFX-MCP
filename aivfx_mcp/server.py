@@ -60,5 +60,15 @@ def main():
     mcp.run()
 
 
+def main_http():
+    """Serve the feed over streamable-http on localhost, for a remote (Cloudflare-tunneled) MCP. Binds 127.0.0.1
+    so ONLY the local tunnel client can reach it, never the LAN. Env: MCP_HOST, MCP_PORT (default 8787).
+    Keep WORKFLOWS_ROOT set so get_workflow stays path-restricted, and put rate-limiting at the Cloudflare edge."""
+    import os
+    mcp.settings.host = os.environ.get("MCP_HOST", "127.0.0.1")
+    mcp.settings.port = int(os.environ.get("MCP_PORT", "8787"))
+    mcp.run(transport="streamable-http")
+
+
 if __name__ == "__main__":
     main()

@@ -8,12 +8,13 @@ resolved artifacts (github, hf_model, hf_quants, license, model_size_gb, arxiv).
 
 External dependencies (embedding, Qdrant) are injected so the logic can be tested offline. The defaults talk to a
 local Ollama + Qdrant; override via env (OLLAMA_URL, QDRANT_URL, FEED_COLLECTION, EMBED_MODEL)."""
-import os, re, json, html, urllib.request
+import os, re, json, html, socket, ipaddress, urllib.request, urllib.parse
 
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
 QDRANT_URL = os.environ.get("QDRANT_URL", "http://localhost:6333")
 COLLECTION = os.environ.get("FEED_COLLECTION", "published_posts")
 EMBED_MODEL = os.environ.get("EMBED_MODEL", "nomic-embed-text")
+WORKFLOWS_ROOT = os.environ.get("WORKFLOWS_ROOT", "")   # if set, get_workflow only reads files under this dir (hosted path-safety)
 
 
 def _post(url, body, timeout=20):
@@ -90,7 +91,16 @@ def latest(n=10, *, qdrant_scroll=qdrant_scroll_default):
 
 def _read_workflow_file(path, max_chars=262144):
     """Read a workflow file as text for inlining to the agent. Returns (content, None) or (None, error).
-    Missing/too-large/binary -> error string (the caller falls back to the Telegram download link)."""
+    Missing/too-large/binary -> error string (the caller falls back to the Telegram download link).
+    When WORKFLOWS_ROOT is set (a hosted server), the path MUST resolve under it, so a payload can only point
+    at a real workflow file, never an arbitrary path on the host."""
+    if WORKFLOWS_ROOT:
+        try:
+            root = os.path.realpath(WORKFLOWS_ROOT)
+            if os.path.commonpath([root, os.path.realpath(path)]) != root:
+                return None, "workflow path outside the allowed directory"
+        except Exception:
+            return None, "invalid workflow path"
     try:
         with open(path, "rb") as f:
             data = f.read(max_chars + 1)
@@ -141,7 +151,35 @@ def _hf_id(url_or_id):
     return url_or_id.split("huggingface.co/")[-1].rstrip("/")
 
 
+def _safe_public_url(url):
+    """True only for an http(s) URL whose host resolves to a PUBLIC ip. Blocks SSRF: a user passing
+    http://localhost:6333, http://169.254.169.254 (cloud metadata), or a private-LAN address to make this
+    server fetch internal services. Used before every server-side fetch in read_docs."""
+    try:
+        u = urllib.parse.urlparse(url or "")
+    except Exception:
+        return False
+    if u.scheme not in ("http", "https") or not u.hostname:
+        return False
+    try:
+        infos = socket.getaddrinfo(u.hostname, u.port or (443 if u.scheme == "https" else 80),
+                                   proto=socket.IPPROTO_TCP)
+    except Exception:
+        return False
+    for info in infos:
+        try:
+            ip = ipaddress.ip_address(info[4][0])
+        except Exception:
+            return False
+        if (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved
+                or ip.is_multicast or ip.is_unspecified):
+            return False
+    return bool(infos)
+
+
 def _get_text(url, timeout=20):
+    if not _safe_public_url(url):
+        raise ValueError("blocked: non-public or invalid URL")
     req = urllib.request.Request(url, headers={"User-Agent": "ai-vfx-mcp"})
     with urllib.request.urlopen(req, timeout=timeout) as r:
         return r.read().decode("utf-8", "ignore")
@@ -187,7 +225,10 @@ def read_docs(url, max_chars=20000, *, http_get=_get_text):
     if _looks_html(text):
         text = _strip_html(text)
     text = text.strip()[:max_chars]
-    return {"url": url, "source": used, "text": text, "chars": len(text)}
+    out = {"url": url, "source": used, "text": text, "chars": len(text)}
+    if not text and not _safe_public_url(url):
+        out["error"] = "blocked: non-public or invalid URL"
+    return out
 
 
 def install_plan(item):
