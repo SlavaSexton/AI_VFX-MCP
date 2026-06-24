@@ -18,6 +18,11 @@ Hugging Face model with its license / size / quantizations, the arXiv paper, and
 fetches them and tries them. It speaks the open [Model Context Protocol](https://modelcontextprotocol.io), so
 Claude, Gemini, Codex, or anything MCP-aware can use it.
 
+> **Quickstart (30 seconds).** Add one URL to your agent, nothing to install, the feed is hosted:
+> `https://mcp.aivfxnews.com/mcp`
+> Claude Code: `claude mcp add --transport http ai-vfx-feed https://mcp.aivfxnews.com/mcp`
+> Other clients (Cursor, Codex, Gemini, Qwen, Claude Desktop) in the list just below.
+
 ## Connect to the live feed
 
 The feed is **hosted**. Nothing to install, no database to run, you point your agent at one URL and search. The
