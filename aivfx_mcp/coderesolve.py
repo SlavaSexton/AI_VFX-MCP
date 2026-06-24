@@ -61,7 +61,7 @@ _SCRAPE_SKIP = ("github.com", "huggingface.co", "arxiv.org", "twitter.com", "x.c
 
 
 def _scrape_candidate(blob, out):
-    """A project/research page worth scraping for links (e.g. repo-sam.inria.fr) — the first URL that isn't
+    """A project/research page worth scraping for links (e.g. repo-sam.inria.fr) - the first URL that isn't
     itself a repo/model/paper/social link."""
     for u in re.findall(r'https?://[^\s"\'<>)]+', blob or ""):
         if any(s in u.lower() for s in _SCRAPE_SKIP):

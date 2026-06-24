@@ -13,15 +13,15 @@ that speaks MCP. API is API.
 
 ## What it does
 
-- **`search_feed(query, top_k=8)`** — semantic search over the published-posts archive (Qdrant + nomic-embed).
+- **`search_feed(query, top_k=8)`** - semantic search over the published-posts archive (Qdrant + nomic-embed).
   Each result carries `title`, `summary`, `source_url`, `tg_url`, and the resolved artifacts: `github`,
   `hf_model`, `hf_quants`, `license`, `model_size_gb`, `arxiv`.
-- **`latest(n=10)`** — the newest items, same shape.
-- **`install_plan(github, hf_model, hf_quants)`** — turns an item's artifacts into ready-to-run commands
+- **`latest(n=10)`** - the newest items, same shape.
+- **`install_plan(github, hf_model, hf_quants)`** - turns an item's artifacts into ready-to-run commands
   (`git clone …`, `huggingface-cli download …`). The calling agent runs them under its own rules.
-- **`resolve_artifacts(name, text)`** — on-demand resolver for items not pre-resolved: finds the GitHub repo, the
+- **`resolve_artifacts(name, text)`** - on-demand resolver for items not pre-resolved: finds the GitHub repo, the
   Hugging Face model (license/size) and its quantizations, arXiv → code via Papers with Code, and a docs link.
-- **`read_docs(url, max_chars=20000)`** — fetch readable text (GitHub/HF README, arXiv, docs page) so an agent can
+- **`read_docs(url, max_chars=20000)`** - fetch readable text (GitHub/HF README, arXiv, docs page) so an agent can
   implement a technique even when there is no runnable repo.
 
 The feed is kept fresh by the pipeline, so reads are offline-friendly and put zero load on the running bot.
@@ -47,7 +47,7 @@ Needs a reachable Qdrant (the pipeline's `published_posts` collection) and Ollam
 
 ## Configure your agent
 
-Stdio server — the command is the same for every MCP client.
+Stdio server - the command is the same for every MCP client.
 
 **Claude Code:**
 ```bash
@@ -80,13 +80,13 @@ claude mcp add ai-vfx-feed -- python -m aivfx_mcp.server
 | `OLLAMA_URL` | `http://localhost:11434` | Ollama for query embeddings |
 | `FEED_COLLECTION` | `published_posts` | Qdrant collection name |
 | `EMBED_MODEL` | `nomic-embed-text` | Embedding model (must match the index) |
-| `GITHUB_TOKEN` | — | Optional, raises GitHub search rate limit |
+| `GITHUB_TOKEN` | - | Optional, raises GitHub search rate limit |
 
 ## Safety
 
 Installing code or models from a feed means running untrusted artifacts. This server only **hands over** verified
 links and exact commands; it never installs anything. Downloading and running is the consuming agent's
-responsibility — inspect first, gate behind approval, run isolated, and watch model sizes against your disk/VRAM.
+responsibility - inspect first, gate behind approval, run isolated, and watch model sizes against your disk/VRAM.
 
 ## Tests
 
@@ -94,4 +94,4 @@ responsibility — inspect first, gate behind approval, run isolated, and watch 
 python -m pytest -q
 ```
 
-Built solo by Slava Sexton — part of the AI VFX autonomous pipeline.
+Built solo by Slava Sexton - part of the AI VFX autonomous pipeline.

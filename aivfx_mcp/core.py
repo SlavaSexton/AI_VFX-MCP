@@ -43,7 +43,7 @@ def qdrant_scroll_default(limit):
 
 
 def qdrant_get_default(point_id):
-    """Retrieve one point (with payload) by its Qdrant id — used to fetch a specific post's workflow."""
+    """Retrieve one point (with payload) by its Qdrant id - used to fetch a specific post's workflow."""
     res = _post(f"{QDRANT_URL}/collections/{COLLECTION}/points",
                 {"ids": [point_id], "with_payload": True}, 20)
     pts = res.get("result") or []
@@ -97,16 +97,16 @@ def _read_workflow_file(path, max_chars=262144):
     except Exception:
         return None, "file not found on the feed host"
     if len(data) > max_chars:
-        return None, f"file too large to inline ({max_chars}+ bytes) — download from Telegram"
+        return None, f"file too large to inline ({max_chars}+ bytes) - download from Telegram"
     try:
         return data.decode("utf-8"), None
     except Exception:
-        return None, "binary file — download from Telegram"
+        return None, "binary file - download from Telegram"
 
 
 def get_workflow(post_id="", query="", *, embed=embed_ollama, qdrant_search=qdrant_search_default,
                  qdrant_get=qdrant_get_default, read_file=_read_workflow_file):
-    """Fetch the workflow file attached to a feed post. Resolve the post by Qdrant point id (post_id — an
+    """Fetch the workflow file attached to a feed post. Resolve the post by Qdrant point id (post_id - an
     item's 'id' from search_feed/latest) OR by semantic query (first matching post that has a workflow), read
     its file from the feed host, and return {filename, content, tg_url, post_title}. If the file can't be
     inlined (binary / too large / missing) returns {error, filename, tg_url, post_title} so the agent can
@@ -163,7 +163,7 @@ def _looks_html(s):
 def read_docs(url, max_chars=20000, *, http_get=_get_text):
     """Fetch readable documentation text for a URL so an agent can implement from it when no runnable repo exists.
     GitHub/HF resolve to the raw README/model-card; other pages are fetched and stripped of HTML. Consumer-side
-    only — this never feeds the pipeline's writer model."""
+    only - this never feeds the pipeline's writer model."""
     targets = [url]
     mg = re.search(r'github\.com/([^/\s]+)/([^/\s#?]+)', url or "")
     mh = re.search(r'huggingface\.co/([^\s#?]+)', url or "")
@@ -192,7 +192,7 @@ def read_docs(url, max_chars=20000, *, http_get=_get_text):
 
 def install_plan(item):
     """Ready-to-run fetch commands for an item's artifacts. The CONSUMING agent runs these (under its own
-    sandbox/approval rules) — this only hands over the exact commands."""
+    sandbox/approval rules) - this only hands over the exact commands."""
     cmds = []
     if item.get("github"):
         cmds.append({"type": "git", "cmd": f"git clone {item['github']}", "target": item["github"]})
