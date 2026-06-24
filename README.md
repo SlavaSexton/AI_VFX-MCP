@@ -25,23 +25,40 @@ curated archive lives behind it and the pipeline keeps it fresh.
 
 **Endpoint:** `https://mcp.aivfxnews.com/mcp`
 
-**Claude Code:**
+Add it once to your client, then the agent uses the feed on its own. The universal method (works in **every** MCP
+client) is the `mcp-remote` bridge; clients that support remote MCP natively can take the URL directly.
+
+**Claude Code** (terminal):
 ```bash
 claude mcp add --transport http ai-vfx-feed https://mcp.aivfxnews.com/mcp
 ```
 
-**Any other MCP client** (Claude Desktop, Gemini, Codex, and the like) bridges the remote endpoint to stdio:
+**Claude Desktop:** Settings -> Connectors -> Add custom connector -> paste `https://mcp.aivfxnews.com/mcp`.
+(Older builds: drop the universal bridge block below into `claude_desktop_config.json`.)
+
+**Cursor:** Settings -> MCP -> Add server, or `~/.cursor/mcp.json`:
 ```json
-{
-  "mcpServers": {
-    "ai-vfx-feed": {
-      "command": "npx",
-      "args": ["mcp-remote", "https://mcp.aivfxnews.com/mcp"]
-    }
-  }
-}
+{ "mcpServers": { "ai-vfx-feed": { "url": "https://mcp.aivfxnews.com/mcp" } } }
 ```
-Clients with native remote-MCP support can take the URL directly.
+
+**Codex CLI** (`~/.codex/config.toml`):
+```toml
+[mcp_servers.ai-vfx-feed]
+command = "npx"
+args = ["mcp-remote", "https://mcp.aivfxnews.com/mcp"]
+```
+
+**Gemini CLI** (`~/.gemini/settings.json`) and **Qwen Code** (`~/.qwen/settings.json`):
+```json
+{ "mcpServers": { "ai-vfx-feed": { "httpUrl": "https://mcp.aivfxnews.com/mcp" } } }
+```
+
+**Any other MCP client** - the universal bridge (turns the remote endpoint into a local stdio server):
+```json
+{ "mcpServers": { "ai-vfx-feed": { "command": "npx", "args": ["mcp-remote", "https://mcp.aivfxnews.com/mcp"] } } }
+```
+The bridge needs Node.js (`npx`). If a native field above is not supported in your version, use this bridge block,
+it works with every client. Restart the client after adding it, then ask the agent for AI VFX news, models, or workflows.
 
 That is the whole setup. Once connected, the agent searches, pulls the repos / models / links / workflows, and
 works with them on its own.
