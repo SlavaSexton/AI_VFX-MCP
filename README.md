@@ -94,4 +94,8 @@ responsibility - inspect first, gate behind approval, run isolated, and watch mo
 python -m pytest -q
 ```
 
+## License
+
+Noncommercial use only. PolyForm Noncommercial License 1.0.0: free for personal, research, and nonprofit use; commercial use needs a separate license from the author. See [LICENSE](LICENSE).
+
 Built solo by Slava Sexton - part of the AI VFX autonomous pipeline.
