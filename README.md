@@ -5,7 +5,7 @@
 <p align="center">
   <a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/MCP-compatible-7C3AED" alt="MCP compatible"></a>
   <img src="https://img.shields.io/badge/license-PolyForm%20NC%201.0.0-blue" alt="License: PolyForm Noncommercial">
-  <a href="https://t.me/AI_VFX_NEWS"><img src="https://img.shields.io/badge/feed-%40AI__VFX__NEWS-26A5E4?logo=telegram&logoColor=white" alt="Telegram @AI_VFX_NEWS"></a>
+  <a href="https://t.me/addlist/Ace2XqUflo9jYjFk"><img src="https://img.shields.io/badge/feed-AI_VFX_NEWS-26A5E4?logo=telegram&logoColor=white" alt="Telegram AI VFX NEWS"></a>
 </p>
 
 <p align="center">
@@ -117,4 +117,4 @@ inspect first, gate behind approval, run isolated, and watch model sizes against
 Noncommercial use only. PolyForm Noncommercial License 1.0.0: free for personal, research and nonprofit use;
 commercial use needs a separate license from the author. See [LICENSE](LICENSE).
 
-Built solo by Slava Sexton, part of the AI VFX autonomous pipeline.
+Built solo by Slava Sexton, part of the **[AI VFX NEWS](https://t.me/addlist/Ace2XqUflo9jYjFk)** autonomous pipeline.
