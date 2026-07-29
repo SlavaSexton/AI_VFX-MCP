@@ -6,8 +6,21 @@ from . import core, coderesolve
 
 try:
     from mcp.server.fastmcp import FastMCP
-except Exception as e:                                      # pragma: no cover - import guard for a clearer message
-    raise SystemExit("The 'mcp' package is required. Install with: pip install mcp") from e
+except ImportError as e:                                    # pragma: no cover - import guard for a clearer message
+    # 2026-07-28: SDK v2 dropped mcp.server.fastmcp (FastMCP became MCPServer), and a bare
+    # `pip install mcp` now resolves to 2.x. Tell the user which of the two cases they hit
+    # instead of the old blanket "package is required", which lied when mcp WAS installed.
+    try:
+        from importlib.metadata import version as _v
+        _installed = _v("mcp")
+    except Exception:
+        _installed = None
+    if _installed:
+        raise SystemExit(
+            f"Installed 'mcp' is {_installed}, which no longer provides mcp.server.fastmcp.\n"
+            f"This server targets the 1.x SDK. Install it with:  pip install 'mcp>=1.28,<2'"
+        ) from e
+    raise SystemExit("The 'mcp' package is required. Install with: pip install 'mcp>=1.28,<2'") from e
 
 mcp = FastMCP("ai-vfx-feed")
 

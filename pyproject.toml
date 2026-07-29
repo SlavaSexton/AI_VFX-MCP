@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "MCP server giving any AI agent searchable access to the AI VFX news feed and the code/models behind it"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = ["mcp>=1.2.0"]
+dependencies = ["mcp>=1.28,<2"]
 
 [project.scripts]
 aivfx-mcp = "aivfx_mcp.server:main"
