@@ -3,7 +3,7 @@
 <h1 align="center">AI VFX NEWS - MCP</h1>
 
 <p align="center">
-  <a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/MCP-compatible-7C3AED" alt="MCP compatible"></a>
+  <a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/MCP-2026--07--28-7C3AED" alt="MCP spec 2026-07-28"></a>
   <img src="https://img.shields.io/badge/license-PolyForm%20NC%201.0.0-blue" alt="License: PolyForm Noncommercial">
   <a href="https://t.me/addlist/Ace2XqUflo9jYjFk"><img src="https://img.shields.io/badge/feed-AI_VFX_NEWS-26A5E4?logo=telegram&logoColor=white" alt="Telegram AI VFX NEWS"></a>
 </p>
@@ -17,6 +17,10 @@ Ask "what's new in open video models" and the agent gets back not just the headl
 Hugging Face model with its license / size / quantizations, the arXiv paper, and any attached workflow, then
 fetches them and tries them. It speaks the open [Model Context Protocol](https://modelcontextprotocol.io), so
 Claude, Gemini, Codex, or anything MCP-aware can use it.
+
+Running the **2026-07-28** specification (stateless protocol core: no handshake, no session header, every
+request self-describing). Older clients keep working unchanged, the SDK serves earlier revisions from the same
+endpoint, so there is nothing for you to change either way.
 
 > **Quickstart (30 seconds).** Add one URL to your agent, nothing to install, the feed is hosted:
 > `https://mcp.aivfxnews.com/mcp`

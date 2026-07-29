@@ -22,7 +22,11 @@ except ImportError as e:                                    # pragma: no cover -
         ) from e
     raise SystemExit("The 'mcp' package is required. Install with: pip install 'mcp>=2.0'") from e
 
-mcp = MCPServer("ai-vfx-feed")
+# version flows from __init__ so serverInfo stops reporting an empty string to clients
+# (v2 added version to the MCPServer constructor; an unversioned server reports "").
+from . import __version__ as _pkg_version
+
+mcp = MCPServer("ai-vfx-feed", version=_pkg_version)
 
 
 @mcp.tool()
