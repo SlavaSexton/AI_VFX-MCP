@@ -5,11 +5,11 @@ script `aivfx-mcp`. Configuration is by env (OLLAMA_URL, QDRANT_URL, FEED_COLLEC
 from . import core, coderesolve
 
 try:
-    from mcp.server.fastmcp import FastMCP
+    from mcp.server.mcpserver import MCPServer
 except ImportError as e:                                    # pragma: no cover - import guard for a clearer message
-    # 2026-07-28: SDK v2 dropped mcp.server.fastmcp (FastMCP became MCPServer), and a bare
-    # `pip install mcp` now resolves to 2.x. Tell the user which of the two cases they hit
-    # instead of the old blanket "package is required", which lied when mcp WAS installed.
+    # RESPONSIBLE FOR: SDK v2 migration (2026-07-29). The 2026-07-28 spec renamed FastMCP to
+    # MCPServer and removed mcp.server.fastmcp, so a 1.x install lands here. Name the actual
+    # problem: the old guard claimed "the package is required" even when mcp WAS installed.
     try:
         from importlib.metadata import version as _v
         _installed = _v("mcp")
@@ -17,12 +17,12 @@ except ImportError as e:                                    # pragma: no cover -
         _installed = None
     if _installed:
         raise SystemExit(
-            f"Installed 'mcp' is {_installed}, which no longer provides mcp.server.fastmcp.\n"
-            f"This server targets the 1.x SDK. Install it with:  pip install 'mcp>=1.28,<2'"
+            f"Installed 'mcp' is {_installed}, which predates the 2026-07-28 spec (no mcp.server.mcpserver).\n"
+            f"This server targets the v2 SDK. Upgrade with:  pip install 'mcp>=2.0'"
         ) from e
-    raise SystemExit("The 'mcp' package is required. Install with: pip install 'mcp>=1.28,<2'") from e
+    raise SystemExit("The 'mcp' package is required. Install with: pip install 'mcp>=2.0'") from e
 
-mcp = FastMCP("ai-vfx-feed")
+mcp = MCPServer("ai-vfx-feed")
 
 
 @mcp.tool()
@@ -76,12 +76,11 @@ def main():
 def main_http():
     """Serve the feed over streamable-http on localhost, for a remote (Cloudflare-tunneled) MCP. Binds 127.0.0.1
     so ONLY the local tunnel client can reach it, never the LAN. Env: MCP_HOST, MCP_PORT (default 8787),
-    MCP_ALLOWED_HOSTS (comma-separated public hostnames the tunnel serves under).
+    MCP_ALLOWED_HOSTS (comma-separated public hostnames the tunnel serves under), MCP_STATELESS=1 to opt
+    into the 2026-07-28 stateless transport (any request may land on any instance; no session state).
     Keep WORKFLOWS_ROOT set so get_workflow stays path-restricted, and put rate-limiting at the Cloudflare edge."""
     import os
     from mcp.server.transport_security import TransportSecuritySettings
-    mcp.settings.host = os.environ.get("MCP_HOST", "127.0.0.1")
-    mcp.settings.port = int(os.environ.get("MCP_PORT", "8787"))
     # Behind a tunnel the Host header is the PUBLIC hostname, not 127.0.0.1, so the SDK's default
     # localhost-only DNS-rebinding guard 421s every tunneled request. With a fixed domain (named
     # tunnel) pin it via MCP_ALLOWED_HOSTS and keep the guard ON; with an ephemeral quick tunnel
@@ -90,12 +89,25 @@ def main_http():
     # reaches it) and the feed is read-only.  RESPONSIBLE FOR: tunneled-host 421 fix (2026-06-24).
     allowed = [h.strip() for h in os.environ.get("MCP_ALLOWED_HOSTS", "").split(",") if h.strip()]
     if allowed:
-        mcp.settings.transport_security = TransportSecuritySettings(
+        security = TransportSecuritySettings(
             enable_dns_rebinding_protection=True, allowed_hosts=allowed, allowed_origins=allowed)
     else:
-        mcp.settings.transport_security = TransportSecuritySettings(
-            enable_dns_rebinding_protection=False)
-    mcp.run(transport="streamable-http")
+        security = TransportSecuritySettings(enable_dns_rebinding_protection=False)
+    # RESPONSIBLE FOR: SDK v2 migration (2026-07-29). v2 moved every transport parameter off the
+    # constructor / mcp.settings and onto run(); mcp.settings now holds only debug, log_level and
+    # the duplicate-warning flags, so the old `mcp.settings.host = ...` would silently no-op.
+    # stateless_http is the 2026-07-28 spec's headline mode and this server is a read-only tool
+    # server (no sampling / elicitation / roots), so it has no back-channel to lose. It stays
+    # OPT-IN via MCP_STATELESS so the tunneled production instance keeps its current behaviour
+    # until the owner flips it deliberately.
+    stateless = os.environ.get("MCP_STATELESS", "0") == "1"
+    mcp.run(
+        transport="streamable-http",
+        host=os.environ.get("MCP_HOST", "127.0.0.1"),
+        port=int(os.environ.get("MCP_PORT", "8787")),
+        transport_security=security,
+        stateless_http=stateless,
+    )
 
 
 if __name__ == "__main__":
